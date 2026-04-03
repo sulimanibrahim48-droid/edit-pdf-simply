@@ -302,14 +302,20 @@ const PdfCanvas = ({
     setDrawStart(null);
   };
 
-  const handleTextInput = useCallback(
-    (id: string, text: string) => {
-      onAnnotationsChange(
-        annotations.map((a) => (a.id === id ? { ...a, text } : a))
-      );
-    },
-    [annotations, onAnnotationsChange]
-  );
+  const commitTextEdit = useCallback(() => {
+    if (editingTextId) {
+      if (editingText.trim()) {
+        onAnnotationsChange(
+          annotations.map((a) => (a.id === editingTextId ? { ...a, text: editingText } : a))
+        );
+      } else {
+        // Remove empty text annotations
+        onAnnotationsChange(annotations.filter((a) => a.id !== editingTextId));
+      }
+      setEditingTextId(null);
+      setEditingText("");
+    }
+  }, [editingTextId, editingText, annotations, onAnnotationsChange]);
 
   return (
     <div
