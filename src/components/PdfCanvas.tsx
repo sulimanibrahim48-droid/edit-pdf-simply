@@ -316,7 +316,10 @@ const PdfCanvas = ({
         <canvas
           ref={overlayCanvasRef}
           className="absolute inset-0 w-full h-full"
-          style={{ cursor: activeTool === "select" ? "default" : "crosshair" }}
+          style={{
+            cursor: activeTool === "select" ? "default" : "crosshair",
+            pointerEvents: editingTextId ? "none" : "auto",
+          }}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
@@ -341,6 +344,8 @@ const PdfCanvas = ({
                   color: ann.color,
                   borderColor: ann.color,
                   fontSize: 16 * scaleY,
+                  zIndex: 20,
+                  minWidth: '100px',
                 }}
                 value={ann.text || ""}
                 onChange={(e) => handleTextInput(ann.id, e.target.value)}
