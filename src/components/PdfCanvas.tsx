@@ -189,8 +189,11 @@ const PdfCanvas = ({
         page: currentPage,
       };
       onAnnotationsChange([...annotations, newAnn]);
+      setEditingText("");
       setEditingTextId(id);
       setIsDrawing(false);
+      // Focus input after render
+      setTimeout(() => textInputRef.current?.focus(), 50);
       return;
     }
 
