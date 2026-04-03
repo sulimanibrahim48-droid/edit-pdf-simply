@@ -48,7 +48,9 @@ const PdfCanvas = ({
   const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
   const [currentPoints, setCurrentPoints] = useState<{ x: number; y: number }[]>([]);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState("");
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
+  const textInputRef = useRef<HTMLInputElement>(null);
 
   // Load PDF
   useEffect(() => {
@@ -187,8 +189,11 @@ const PdfCanvas = ({
         page: currentPage,
       };
       onAnnotationsChange([...annotations, newAnn]);
+      setEditingText("");
       setEditingTextId(id);
       setIsDrawing(false);
+      // Focus input after render
+      setTimeout(() => textInputRef.current?.focus(), 50);
       return;
     }
 
@@ -297,14 +302,20 @@ const PdfCanvas = ({
     setDrawStart(null);
   };
 
-  const handleTextInput = useCallback(
-    (id: string, text: string) => {
-      onAnnotationsChange(
-        annotations.map((a) => (a.id === id ? { ...a, text } : a))
-      );
-    },
-    [annotations, onAnnotationsChange]
-  );
+  const commitTextEdit = useCallback(() => {
+    if (editingTextId) {
+      if (editingText.trim()) {
+        onAnnotationsChange(
+          annotations.map((a) => (a.id === editingTextId ? { ...a, text: editingText } : a))
+        );
+      } else {
+        // Remove empty text annotations
+        onAnnotationsChange(annotations.filter((a) => a.id !== editingTextId));
+      }
+      setEditingTextId(null);
+      setEditingText("");
+    }
+  }, [editingTextId, editingText, annotations, onAnnotationsChange]);
 
   return (
     <div
@@ -336,7 +347,7 @@ const PdfCanvas = ({
             return (
               <input
                 key={ann.id}
-                autoFocus
+                ref={textInputRef}
                 className="absolute bg-transparent border-b-2 outline-none text-sm"
                 style={{
                   left: ann.x * scaleX,
@@ -347,10 +358,10 @@ const PdfCanvas = ({
                   zIndex: 20,
                   minWidth: '100px',
                 }}
-                value={ann.text || ""}
-                onChange={(e) => handleTextInput(ann.id, e.target.value)}
-                onBlur={() => setEditingTextId(null)}
-                onKeyDown={(e) => e.key === "Enter" && setEditingTextId(null)}
+                value={editingText}
+                onChange={(e) => setEditingText(e.target.value)}
+                onBlur={commitTextEdit}
+                onKeyDown={(e) => e.key === "Enter" && commitTextEdit()}
               />
             );
           })}
