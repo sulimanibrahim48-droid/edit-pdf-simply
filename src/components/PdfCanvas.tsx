@@ -341,6 +341,8 @@ const PdfCanvas = ({
                   color: ann.color,
                   borderColor: ann.color,
                   fontSize: 16 * scaleY,
+                  zIndex: 20,
+                  minWidth: '100px',
                 }}
                 value={ann.text || ""}
                 onChange={(e) => handleTextInput(ann.id, e.target.value)}
