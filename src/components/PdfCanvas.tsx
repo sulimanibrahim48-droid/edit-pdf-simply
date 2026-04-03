@@ -347,7 +347,7 @@ const PdfCanvas = ({
             return (
               <input
                 key={ann.id}
-                autoFocus
+                ref={textInputRef}
                 className="absolute bg-transparent border-b-2 outline-none text-sm"
                 style={{
                   left: ann.x * scaleX,
@@ -358,10 +358,10 @@ const PdfCanvas = ({
                   zIndex: 20,
                   minWidth: '100px',
                 }}
-                value={ann.text || ""}
-                onChange={(e) => handleTextInput(ann.id, e.target.value)}
-                onBlur={() => setEditingTextId(null)}
-                onKeyDown={(e) => e.key === "Enter" && setEditingTextId(null)}
+                value={editingText}
+                onChange={(e) => setEditingText(e.target.value)}
+                onBlur={commitTextEdit}
+                onKeyDown={(e) => e.key === "Enter" && commitTextEdit()}
               />
             );
           })}
