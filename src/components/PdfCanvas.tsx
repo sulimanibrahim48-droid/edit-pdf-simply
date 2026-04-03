@@ -48,7 +48,9 @@ const PdfCanvas = ({
   const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
   const [currentPoints, setCurrentPoints] = useState<{ x: number; y: number }[]>([]);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState("");
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
+  const textInputRef = useRef<HTMLInputElement>(null);
 
   // Load PDF
   useEffect(() => {
