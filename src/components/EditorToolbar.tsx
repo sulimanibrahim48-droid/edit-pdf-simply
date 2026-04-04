@@ -26,6 +26,7 @@ import {
 export type Tool =
   | "select"
   | "text"
+  | "text-replace"
   | "image"
   | "rectangle"
   | "circle"

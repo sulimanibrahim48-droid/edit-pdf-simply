@@ -23,6 +23,8 @@ interface Annotation {
   endX?: number;
   endY?: number;
   page: number;
+  fontSize?: number;
+  imageUrl?: string;
 }
 
 const PdfEditor = ({ file, onBack }: PdfEditorProps) => {
@@ -191,7 +193,7 @@ const PdfEditor = ({ file, onBack }: PdfEditorProps) => {
       }
 
       const pdfBytes = await pdfDoc.save();
-      const blob = new Blob([pdfBytes], { type: "application/pdf" });
+      const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
