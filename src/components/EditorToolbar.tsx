@@ -175,7 +175,7 @@ const EditorToolbar = ({
       <div className="ml-auto">
         <Button variant="hero" size="sm" onClick={onDownload}>
           <Download className="h-4 w-4 mr-1" />
-          Download
+          Save PDF
         </Button>
       </div>
     </div>
