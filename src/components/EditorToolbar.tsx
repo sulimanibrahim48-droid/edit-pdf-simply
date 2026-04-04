@@ -117,11 +117,10 @@ const EditorToolbar = ({
         {colors.map((color) => (
           <button
             key={color}
-            className={`h-6 w-6 rounded-full border-2 transition-all ${
-              activeColor === color
-                ? "border-toolbar-foreground scale-110"
-                : "border-transparent hover:scale-105"
-            }`}
+            className={`h-6 w-6 rounded-full border-2 transition-all ${activeColor === color
+              ? "border-toolbar-foreground scale-110"
+              : "border-transparent hover:scale-105"
+              }`}
             style={{ backgroundColor: color }}
             onClick={() => onColorChange(color)}
           />
@@ -175,7 +174,7 @@ const EditorToolbar = ({
       <div className="ml-auto">
         <Button variant="hero" size="sm" onClick={onDownload}>
           <Download className="h-4 w-4 mr-1" />
-          Save PDF
+          Save and Download PDF
         </Button>
       </div>
     </div>
