@@ -6,7 +6,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs
 
 interface Annotation {
   id: string;
-  type: Tool;
+  type: Tool | "text-replace";
   x: number;
   y: number;
   width?: number;
@@ -17,6 +17,17 @@ interface Annotation {
   endX?: number;
   endY?: number;
   page: number;
+  originalText?: string;
+  fontSize?: number;
+}
+
+interface PdfTextItem {
+  text: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  fontSize: number;
 }
 
 interface PdfCanvasProps {
@@ -50,6 +61,7 @@ const PdfCanvas = ({
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
+  const [pdfTextItems, setPdfTextItems] = useState<PdfTextItem[]>([]);
   const textInputRef = useRef<HTMLInputElement>(null);
 
   // Load PDF
@@ -63,12 +75,13 @@ const PdfCanvas = ({
     loadPdf();
   }, [file, onPageCountChange]);
 
-  // Render page
+  // Render page and extract text positions
   useEffect(() => {
     if (!pdfDoc || !pdfCanvasRef.current) return;
     const renderPage = async () => {
       const page = await pdfDoc.getPage(currentPage);
-      const viewport = page.getViewport({ scale: zoom * 1.5 });
+      const scale = zoom * 1.5;
+      const viewport = page.getViewport({ scale });
       const canvas = pdfCanvasRef.current!;
       canvas.width = viewport.width;
       canvas.height = viewport.height;
@@ -76,6 +89,31 @@ const PdfCanvas = ({
 
       const ctx = canvas.getContext("2d")!;
       await page.render({ canvasContext: ctx, viewport }).promise;
+
+      // Extract text content with positions
+      const textContent = await page.getTextContent();
+      const items: PdfTextItem[] = [];
+      for (const item of textContent.items) {
+        if (!("str" in item) || !item.str.trim()) continue;
+        const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
+        const fontSize = Math.sqrt(tx[0] * tx[0] + tx[1] * tx[1]);
+        const x = tx[4];
+        const y = tx[5] - fontSize;
+        // Measure width using canvas
+        ctx.save();
+        ctx.font = `${fontSize}px sans-serif`;
+        const measured = ctx.measureText(item.str);
+        ctx.restore();
+        items.push({
+          text: item.str,
+          x,
+          y,
+          width: measured.width,
+          height: fontSize,
+          fontSize,
+        });
+      }
+      setPdfTextItems(items);
     };
     renderPage();
   }, [pdfDoc, currentPage, zoom]);
@@ -140,8 +178,20 @@ const PdfCanvas = ({
         case "text":
           if (editingTextId !== ann.id) {
             ctx.fillStyle = ann.color;
-            ctx.font = "16px Inter, sans-serif";
+            ctx.font = `${ann.fontSize || 16}px Inter, sans-serif`;
             ctx.fillText(ann.text || "", ann.x, ann.y);
+          }
+          break;
+        case "text-replace":
+          // White-out the original text area, then draw replacement
+          if (ann.width && ann.height) {
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(ann.x, ann.y, ann.width, ann.height);
+          }
+          if (editingTextId !== ann.id) {
+            ctx.fillStyle = ann.color;
+            ctx.font = `${ann.fontSize || 16}px Inter, sans-serif`;
+            ctx.fillText(ann.text || "", ann.x, ann.y + (ann.height || 16));
           }
           break;
         case "comment":
@@ -171,6 +221,49 @@ const PdfCanvas = ({
     };
   };
 
+  // Find PDF text item at a given canvas point
+  const findTextAtPoint = (pt: { x: number; y: number }): PdfTextItem | null => {
+    // Check if any existing text-replace annotation already covers this spot
+    const existingReplace = annotations.find(
+      (a) =>
+        a.type === "text-replace" &&
+        a.page === currentPage &&
+        pt.x >= a.x &&
+        pt.x <= a.x + (a.width || 0) &&
+        pt.y >= a.y &&
+        pt.y <= a.y + (a.height || 0)
+    );
+    if (existingReplace) return null; // Let them edit the existing annotation instead
+
+    for (const item of pdfTextItems) {
+      if (
+        pt.x >= item.x &&
+        pt.x <= item.x + item.width &&
+        pt.y >= item.y &&
+        pt.y <= item.y + item.height
+      ) {
+        return item;
+      }
+    }
+    return null;
+  };
+
+  // Find existing text/text-replace annotation at point
+  const findAnnotationAtPoint = (pt: { x: number; y: number }): Annotation | null => {
+    const pageAnns = annotations.filter(
+      (a) => (a.type === "text" || a.type === "text-replace") && a.page === currentPage
+    );
+    for (const ann of pageAnns) {
+      const w = ann.width || 100;
+      const h = ann.height || (ann.fontSize || 16);
+      const ay = ann.type === "text-replace" ? ann.y : ann.y - (ann.fontSize || 16);
+      if (pt.x >= ann.x && pt.x <= ann.x + w && pt.y >= ay && pt.y <= ay + h) {
+        return ann;
+      }
+    }
+    return null;
+  };
+
   const handleMouseDown = (e: React.MouseEvent) => {
     if (activeTool === "select" || activeTool === "eraser") return;
     const pt = getCanvasPoint(e);
@@ -178,6 +271,46 @@ const PdfCanvas = ({
     setDrawStart(pt);
 
     if (activeTool === "text") {
+      // First check if clicking on an existing annotation to re-edit
+      const existingAnn = findAnnotationAtPoint(pt);
+      if (existingAnn) {
+        setEditingText(existingAnn.text || "");
+        setEditingTextId(existingAnn.id);
+        setIsDrawing(false);
+        setTimeout(() => textInputRef.current?.focus(), 50);
+        return;
+      }
+
+      // Check if clicking on existing PDF text to replace it
+      const textItem = findTextAtPoint(pt);
+      if (textItem) {
+        const id = crypto.randomUUID();
+        const padding = 2;
+        const newAnn: Annotation = {
+          id,
+          type: "text-replace",
+          x: textItem.x - padding,
+          y: textItem.y - padding,
+          width: textItem.width + padding * 2,
+          height: textItem.height + padding * 2,
+          color: "#000000",
+          text: textItem.text,
+          originalText: textItem.text,
+          fontSize: textItem.fontSize,
+          page: currentPage,
+        };
+        onAnnotationsChange([...annotations, newAnn]);
+        setEditingText(textItem.text);
+        setEditingTextId(id);
+        setIsDrawing(false);
+        setTimeout(() => {
+          textInputRef.current?.focus();
+          textInputRef.current?.select();
+        }, 50);
+        return;
+      }
+
+      // Otherwise add new text
       const id = crypto.randomUUID();
       const newAnn: Annotation = {
         id,
@@ -186,13 +319,13 @@ const PdfCanvas = ({
         y: pt.y,
         color: activeColor,
         text: "",
+        fontSize: 16,
         page: currentPage,
       };
       onAnnotationsChange([...annotations, newAnn]);
       setEditingText("");
       setEditingTextId(id);
       setIsDrawing(false);
-      // Focus input after render
       setTimeout(() => textInputRef.current?.focus(), 50);
       return;
     }
@@ -228,7 +361,6 @@ const PdfCanvas = ({
 
     if (activeTool === "draw") {
       setCurrentPoints((prev) => [...prev, pt]);
-      // Draw preview
       const ctx = overlayCanvasRef.current!.getContext("2d")!;
       const pts = [...currentPoints, pt];
       if (pts.length > 1) {
@@ -304,18 +436,68 @@ const PdfCanvas = ({
 
   const commitTextEdit = useCallback(() => {
     if (editingTextId) {
+      const ann = annotations.find((a) => a.id === editingTextId);
       if (editingText.trim()) {
-        onAnnotationsChange(
-          annotations.map((a) => (a.id === editingTextId ? { ...a, text: editingText } : a))
-        );
+        // For text-replace, update the white-out width to match new text
+        if (ann?.type === "text-replace") {
+          const canvas = overlayCanvasRef.current;
+          let newWidth = ann.width || 0;
+          if (canvas) {
+            const ctx = canvas.getContext("2d")!;
+            ctx.font = `${ann.fontSize || 16}px Inter, sans-serif`;
+            const measured = ctx.measureText(editingText);
+            newWidth = Math.max(ann.width || 0, measured.width + 4);
+          }
+          onAnnotationsChange(
+            annotations.map((a) =>
+              a.id === editingTextId ? { ...a, text: editingText, width: newWidth } : a
+            )
+          );
+        } else {
+          onAnnotationsChange(
+            annotations.map((a) => (a.id === editingTextId ? { ...a, text: editingText } : a))
+          );
+        }
       } else {
-        // Remove empty text annotations
         onAnnotationsChange(annotations.filter((a) => a.id !== editingTextId));
       }
       setEditingTextId(null);
       setEditingText("");
     }
   }, [editingTextId, editingText, annotations, onAnnotationsChange]);
+
+  // Get the position for the editing input
+  const getEditingInputStyle = (ann: Annotation) => {
+    const canvas = overlayCanvasRef.current;
+    if (!canvas) return {};
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = rect.width / canvas.width;
+    const scaleY = rect.height / canvas.height;
+    const fontSize = ann.fontSize || 16;
+
+    if (ann.type === "text-replace") {
+      return {
+        left: ann.x * scaleX,
+        top: ann.y * scaleY,
+        color: ann.color,
+        borderColor: ann.color,
+        fontSize: fontSize * scaleY,
+        height: (ann.height || fontSize) * scaleY,
+        zIndex: 20,
+        minWidth: `${(ann.width || 100) * scaleX}px`,
+        background: "white",
+      };
+    }
+    return {
+      left: ann.x * scaleX,
+      top: (ann.y - fontSize) * scaleY,
+      color: ann.color,
+      borderColor: ann.color,
+      fontSize: fontSize * scaleY,
+      zIndex: 20,
+      minWidth: "100px",
+    };
+  };
 
   return (
     <div
@@ -328,7 +510,7 @@ const PdfCanvas = ({
           ref={overlayCanvasRef}
           className="absolute inset-0 w-full h-full"
           style={{
-            cursor: activeTool === "select" ? "default" : "crosshair",
+            cursor: activeTool === "select" ? "default" : activeTool === "text" ? "text" : "crosshair",
             pointerEvents: editingTextId ? "none" : "auto",
           }}
           onMouseDown={handleMouseDown}
@@ -337,27 +519,22 @@ const PdfCanvas = ({
         />
         {/* Text input overlays */}
         {annotations
-          .filter((a) => a.type === "text" && a.page === currentPage && editingTextId === a.id)
+          .filter(
+            (a) =>
+              (a.type === "text" || a.type === "text-replace") &&
+              a.page === currentPage &&
+              editingTextId === a.id
+          )
           .map((ann) => {
             const canvas = overlayCanvasRef.current;
             if (!canvas) return null;
-            const rect = canvas.getBoundingClientRect();
-            const scaleX = rect.width / canvas.width;
-            const scaleY = rect.height / canvas.height;
+            const style = getEditingInputStyle(ann);
             return (
               <input
                 key={ann.id}
                 ref={textInputRef}
-                className="absolute bg-transparent border-b-2 outline-none text-sm"
-                style={{
-                  left: ann.x * scaleX,
-                  top: (ann.y - 16) * scaleY,
-                  color: ann.color,
-                  borderColor: ann.color,
-                  fontSize: 16 * scaleY,
-                  zIndex: 20,
-                  minWidth: '100px',
-                }}
+                className="absolute border-b-2 outline-none"
+                style={style}
                 value={editingText}
                 onChange={(e) => setEditingText(e.target.value)}
                 onBlur={commitTextEdit}
