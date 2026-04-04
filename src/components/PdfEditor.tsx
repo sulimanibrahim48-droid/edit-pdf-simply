@@ -23,6 +23,8 @@ interface Annotation {
   endX?: number;
   endY?: number;
   page: number;
+  fontSize?: number;
+  imageUrl?: string;
 }
 
 const PdfEditor = ({ file, onBack }: PdfEditorProps) => {
