@@ -6,7 +6,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs
 
 interface Annotation {
   id: string;
-  type: Tool | "text-replace";
+  type: Tool | "text-replace" | "image";
   x: number;
   y: number;
   width?: number;
@@ -19,6 +19,7 @@ interface Annotation {
   page: number;
   originalText?: string;
   fontSize?: number;
+  imageUrl?: string;
 }
 
 interface PdfTextItem {
@@ -63,6 +64,40 @@ const PdfCanvas = ({
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const [pdfTextItems, setPdfTextItems] = useState<PdfTextItem[]>([]);
   const textInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageCache = useRef<Record<string, HTMLImageElement>>({});
+  const [pendingImagePt, setPendingImagePt] = useState<{x: number, y: number} | null>(null);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && pendingImagePt) {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.src = url;
+      img.onload = () => {
+        imageCache.current[url] = img;
+        const width = Math.min(img.width, 300);
+        const height = img.height * (width / img.width);
+        
+        onAnnotationsChange([
+          ...annotations,
+          {
+            id: crypto.randomUUID(),
+            type: "image",
+            x: pendingImagePt.x,
+            y: pendingImagePt.y,
+            width,
+            height,
+            color: "",
+            imageUrl: url,
+            page: currentPage,
+          }
+        ]);
+        setPendingImagePt(null);
+      }
+    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
   // Load PDF
   useEffect(() => {
@@ -205,6 +240,21 @@ const PdfCanvas = ({
           ctx.textBaseline = "middle";
           ctx.fillText("💬", ann.x, ann.y);
           break;
+        case "image":
+          if (ann.imageUrl) {
+            const img = imageCache.current[ann.imageUrl];
+            if (img) {
+              ctx.drawImage(img, ann.x, ann.y, ann.width || img.width, ann.height || img.height);
+            } else {
+              const newImg = new Image();
+              newImg.src = ann.imageUrl;
+              newImg.onload = () => {
+                imageCache.current[ann.imageUrl!] = newImg;
+                onAnnotationsChange([...annotations]); 
+              };
+            }
+          }
+          break;
       }
       ctx.restore();
     }
@@ -265,8 +315,81 @@ const PdfCanvas = ({
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (activeTool === "select" || activeTool === "eraser") return;
+    if (activeTool === "select") return;
     const pt = getCanvasPoint(e);
+
+    if (activeTool === "image") {
+       setPendingImagePt(pt);
+       fileInputRef.current?.click();
+       return;
+    }
+
+    if (activeTool === "eraser") {
+      const pageAnns = annotations.filter(a => a.page === currentPage);
+      for (let i = pageAnns.length - 1; i >= 0; i--) {
+        const ann = pageAnns[i];
+        let hit = false;
+        if (ann.type === "rectangle" || ann.type === "highlight" || ann.type === "text-replace" || ann.type === "image") {
+          const w = ann.width || 0;
+          const h = ann.height || 0;
+          const left = Math.min(ann.x, ann.x + w);
+          const top = Math.min(ann.y, ann.y + h);
+          hit = pt.x >= left && pt.x <= left + Math.abs(w) && pt.y >= top && pt.y <= top + Math.abs(h);
+        } else if (ann.type === "circle") {
+           const w = ann.width || 0;
+           const h = ann.height || 0;
+           const left = Math.min(ann.x, ann.x + w);
+           const top = Math.min(ann.y, ann.y + h);
+           hit = pt.x >= left && pt.x <= left + Math.abs(w) && pt.y >= top && pt.y <= top + Math.abs(h);
+        } else if (ann.type === "text") {
+           const h = ann.fontSize || 16;
+           const w = 100;
+           hit = pt.x >= ann.x && pt.x <= ann.x + w && pt.y >= ann.y - h && pt.y <= ann.y;
+        } else if (ann.type === "draw" || ann.type === "line") {
+           if (ann.points && ann.points.length > 0) {
+               const xs = ann.points.map(p=>p.x);
+               const ys = ann.points.map(p=>p.y);
+               const minX = Math.min(...xs), maxX = Math.max(...xs);
+               const minY = Math.min(...ys), maxY = Math.max(...ys);
+               hit = pt.x >= minX - 10 && pt.x <= maxX + 10 && pt.y >= minY - 10 && pt.y <= maxY + 10;
+           } else if (ann.endX !== undefined && ann.endY !== undefined) {
+               const minX = Math.min(ann.x, ann.endX), maxX = Math.max(ann.x, ann.endX);
+               const minY = Math.min(ann.y, ann.endY), maxY = Math.max(ann.y, ann.endY);
+               hit = pt.x >= minX - 10 && pt.x <= maxX + 10 && pt.y >= minY - 10 && pt.y <= maxY + 10;
+           }
+        } else if (ann.type === "comment") {
+           hit = Math.hypot(pt.x - ann.x, pt.y - ann.y) <= 12;
+        }
+
+        if (hit) {
+          onAnnotationsChange(annotations.filter(a => a.id !== ann.id));
+          return;
+        }
+      }
+
+      // If we didn't hit an annotation, can we hit PDF text to "erase" it?
+      const textItem = findTextAtPoint(pt);
+      if (textItem) {
+        const id = crypto.randomUUID();
+        const padding = 2;
+        const newAnn: Annotation = {
+          id,
+          type: "text-replace",
+          x: textItem.x - padding,
+          y: textItem.y - padding,
+          width: textItem.width + padding * 2,
+          height: textItem.height + padding * 2,
+          color: "#000000",
+          text: "", // Empty string means it's just a white space over the text!
+          originalText: textItem.text,
+          fontSize: textItem.fontSize,
+          page: currentPage,
+        };
+        onAnnotationsChange([...annotations, newAnn]);
+      }
+      return;
+    }
+
     setIsDrawing(true);
     setDrawStart(pt);
 
@@ -504,6 +627,13 @@ const PdfCanvas = ({
       ref={containerRef}
       className="flex-1 overflow-auto bg-muted/50 flex items-start justify-center p-8"
     >
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        onChange={handleImageUpload}
+        accept="image/*"
+        className="hidden" 
+      />
       <div className="relative shadow-2xl rounded-lg overflow-hidden">
         <canvas ref={pdfCanvasRef} className="block" />
         <canvas

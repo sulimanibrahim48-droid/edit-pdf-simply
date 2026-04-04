@@ -13,6 +13,7 @@ import {
   ZoomOut,
   Download,
   ArrowLeft,
+  Image as ImageIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -25,6 +26,7 @@ import {
 export type Tool =
   | "select"
   | "text"
+  | "image"
   | "rectangle"
   | "circle"
   | "line"
@@ -49,6 +51,7 @@ interface EditorToolbarProps {
 
 const tools: { tool: Tool; icon: React.ElementType; label: string }[] = [
   { tool: "text", icon: Type, label: "Add Text" },
+  { tool: "image", icon: ImageIcon, label: "Add Image" },
   { tool: "draw", icon: Pencil, label: "Draw" },
   { tool: "highlight", icon: Highlighter, label: "Highlight" },
   { tool: "rectangle", icon: Square, label: "Rectangle" },
