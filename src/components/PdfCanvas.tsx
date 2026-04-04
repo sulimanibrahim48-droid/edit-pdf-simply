@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import * as pdfjsLib from "pdfjs-dist";
+import { Rnd } from "react-rnd";
 import type { Tool } from "./EditorToolbar";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs`;
@@ -238,23 +239,6 @@ const PdfCanvas = ({
           ctx.font = "bold 10px Inter, sans-serif";
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
-          ctx.fillText("💬", ann.x, ann.y);
-          break;
-        case "image":
-          if (ann.imageUrl) {
-            const img = imageCache.current[ann.imageUrl];
-            if (img) {
-              ctx.drawImage(img, ann.x, ann.y, ann.width || img.width, ann.height || img.height);
-            } else {
-              const newImg = new Image();
-              newImg.src = ann.imageUrl;
-              newImg.onload = () => {
-                imageCache.current[ann.imageUrl!] = newImg;
-                onAnnotationsChange([...annotations]); 
-              };
-            }
-          }
-          break;
       }
       ctx.restore();
     }
@@ -670,6 +654,41 @@ const PdfCanvas = ({
                 onBlur={commitTextEdit}
                 onKeyDown={(e) => e.key === "Enter" && commitTextEdit()}
               />
+            );
+          })}
+        {/* Image resize overlays */}
+        {annotations
+          .filter((a) => a.type === "image" && a.page === currentPage)
+          .map((ann) => {
+            const canvas = overlayCanvasRef.current;
+            if (!canvas) return null;
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = rect.width / canvas.width;
+            const scaleY = rect.height / canvas.height;
+            return (
+              <Rnd
+                key={ann.id}
+                size={{ width: (ann.width || 100) * scaleX, height: (ann.height || 100) * scaleY }}
+                position={{ x: ann.x * scaleX, y: ann.y * scaleY }}
+                onDragStop={(e, d) => {
+                   onAnnotationsChange(annotations.map(a => a.id === ann.id ? { ...a, x: d.x / scaleX, y: d.y / scaleY } : a));
+                }}
+                onResizeStop={(e, dir, ref, delta, position) => {
+                   onAnnotationsChange(annotations.map(a => a.id === ann.id ? { 
+                     ...a, 
+                     width: parseFloat(ref.style.width) / scaleX, 
+                     height: parseFloat(ref.style.height) / scaleY,
+                     x: position.x / scaleX,
+                     y: position.y / scaleY
+                   } : a));
+                }}
+                bounds="parent"
+                style={{ zIndex: 10, border: activeTool === "select" ? "2px dashed #000" : "none" }}
+                disableDragging={activeTool !== "select"}
+                enableResizing={activeTool === "select"}
+              >
+                <img src={ann.imageUrl} className="w-full h-full object-contain pointer-events-none" />
+              </Rnd>
             );
           })}
       </div>
