@@ -41,6 +41,7 @@ interface PdfCanvasProps {
   onAnnotationsChange: (annotations: Annotation[]) => void;
   currentPage: number;
   onPageCountChange: (count: number) => void;
+  onToolChange: (tool: Tool) => void;
 }
 
 const PdfCanvas = ({
@@ -52,6 +53,7 @@ const PdfCanvas = ({
   onAnnotationsChange,
   currentPage,
   onPageCountChange,
+  onToolChange,
 }: PdfCanvasProps) => {
   const pdfCanvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -95,6 +97,7 @@ const PdfCanvas = ({
           }
         ]);
         setPendingImagePt(null);
+        onToolChange("select");
       }
     }
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -683,6 +686,7 @@ const PdfCanvas = ({
                    } : a));
                 }}
                 bounds="parent"
+                lockAspectRatio={true}
                 style={{ zIndex: 10, border: activeTool === "select" ? "2px dashed #000" : "none" }}
                 disableDragging={activeTool !== "select"}
                 enableResizing={activeTool === "select"}

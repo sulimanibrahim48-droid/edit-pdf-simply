@@ -13,7 +13,8 @@ import {
   ZoomOut,
   Download,
   ArrowLeft,
-  Image as ImageIcon
+  Image as ImageIcon,
+  MousePointer2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -51,6 +52,7 @@ interface EditorToolbarProps {
 }
 
 const tools: { tool: Tool; icon: React.ElementType; label: string }[] = [
+  { tool: "select", icon: MousePointer2, label: "Select/Move" },
   { tool: "text", icon: Type, label: "Add Text" },
   { tool: "image", icon: ImageIcon, label: "Add Image" },
   { tool: "draw", icon: Pencil, label: "Draw" },

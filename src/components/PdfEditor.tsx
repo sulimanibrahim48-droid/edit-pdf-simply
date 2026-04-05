@@ -235,6 +235,7 @@ const PdfEditor = ({ file, onBack }: PdfEditorProps) => {
         activeColor={activeColor}
         annotations={annotations}
         onAnnotationsChange={handleAnnotationsChange}
+        onToolChange={setActiveTool}
         currentPage={currentPage}
         onPageCountChange={setPageCount}
       />
