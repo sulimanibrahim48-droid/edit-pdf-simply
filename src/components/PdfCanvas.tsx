@@ -686,12 +686,11 @@ const PdfCanvas = ({
                    } : a));
                 }}
                 bounds="parent"
-                lockAspectRatio={true}
                 style={{ zIndex: 10, border: activeTool === "select" ? "2px dashed #000" : "none" }}
                 disableDragging={activeTool !== "select"}
                 enableResizing={activeTool === "select"}
               >
-                <img src={ann.imageUrl} className="w-full h-full object-contain pointer-events-none" />
+                <img src={ann.imageUrl} className="w-full h-full object-fill pointer-events-none" />
               </Rnd>
             );
           })}
