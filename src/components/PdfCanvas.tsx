@@ -62,6 +62,7 @@ const PdfCanvas = ({
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
   const [currentPoints, setCurrentPoints] = useState<{ x: number; y: number }[]>([]);
+  const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | null>(null);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
@@ -113,6 +114,21 @@ const PdfCanvas = ({
     };
     loadPdf();
   }, [file, onPageCountChange]);
+
+  // Keyboard events for deleting selected annotations
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (document.activeElement?.tagName === "INPUT" || document.activeElement?.tagName === "TEXTAREA") {
+        return;
+      }
+      if ((e.key === "Delete" || e.key === "Backspace") && selectedAnnotationId) {
+        onAnnotationsChange(annotations.filter((a) => a.id !== selectedAnnotationId));
+        setSelectedAnnotationId(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedAnnotationId, annotations, onAnnotationsChange]);
 
   // Render page and extract text positions
   useEffect(() => {
@@ -302,7 +318,10 @@ const PdfCanvas = ({
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (activeTool === "select") return;
+    if (activeTool === "select") {
+      setSelectedAnnotationId(null);
+      return;
+    }
     const pt = getCanvasPoint(e);
 
     if (activeTool === "image") {
@@ -686,9 +705,12 @@ const PdfCanvas = ({
                    } : a));
                 }}
                 bounds="parent"
-                style={{ zIndex: 10, border: activeTool === "select" ? "2px dashed #000" : "none" }}
+                onMouseDown={() => {
+                   if (activeTool === "select") setSelectedAnnotationId(ann.id);
+                }}
+                style={{ zIndex: 10, border: selectedAnnotationId === ann.id ? "2px dashed #2563eb" : activeTool === "select" ? "2px dashed transparent" : "none", pointerEvents: activeTool === "eraser" ? "none" : "auto" }}
                 disableDragging={activeTool !== "select"}
-                enableResizing={activeTool === "select"}
+                enableResizing={activeTool === "select" ? { top: true, right: true, bottom: true, left: true, topRight: true, bottomRight: true, bottomLeft: true, topLeft: true } : false}
               >
                 <img src={ann.imageUrl} className="w-full h-full object-fill pointer-events-none" />
               </Rnd>
