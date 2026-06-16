@@ -70,7 +70,7 @@ const UploadZone = ({ onFileSelect }: UploadZoneProps) => {
           <input
             ref={inputRef}
             type="file"
-            accept=".pdf,application/pdf"
+            accept=".pdf,application/pdf,image/*"
             className="hidden"
             onChange={handleChange}
           />
@@ -80,9 +80,9 @@ const UploadZone = ({ onFileSelect }: UploadZoneProps) => {
             </div>
             <Button variant="hero" size="xl">
               <FileUp className="h-5 w-5 mr-2" />
-              Select PDF file
+              Select PDF or Image
             </Button>
-            <p className="text-sm text-muted-foreground">or drop PDF here</p>
+            <p className="text-sm text-muted-foreground">or drop PDF / PNG / JPG here</p>
           </div>
         </motion.div>
 
