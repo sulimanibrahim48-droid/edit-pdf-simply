@@ -17,19 +17,22 @@ const UploadZone = ({ onFileSelect }: UploadZoneProps) => {
     setIsDragging(e.type === "dragenter" || e.type === "dragover");
   }, []);
 
+  const isAccepted = (file: File) =>
+    file.type === "application/pdf" || file.type.startsWith("image/");
+
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
       setIsDragging(false);
       const file = e.dataTransfer.files[0];
-      if (file?.type === "application/pdf") onFileSelect(file);
+      if (file && isAccepted(file)) onFileSelect(file);
     },
     [onFileSelect]
   );
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) onFileSelect(file);
+    if (file && isAccepted(file)) onFileSelect(file);
   };
 
   return (
