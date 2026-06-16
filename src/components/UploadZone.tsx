@@ -17,19 +17,22 @@ const UploadZone = ({ onFileSelect }: UploadZoneProps) => {
     setIsDragging(e.type === "dragenter" || e.type === "dragover");
   }, []);
 
+  const isAccepted = (file: File) =>
+    file.type === "application/pdf" || file.type.startsWith("image/");
+
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
       setIsDragging(false);
       const file = e.dataTransfer.files[0];
-      if (file?.type === "application/pdf") onFileSelect(file);
+      if (file && isAccepted(file)) onFileSelect(file);
     },
     [onFileSelect]
   );
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) onFileSelect(file);
+    if (file && isAccepted(file)) onFileSelect(file);
   };
 
   return (
@@ -67,7 +70,7 @@ const UploadZone = ({ onFileSelect }: UploadZoneProps) => {
           <input
             ref={inputRef}
             type="file"
-            accept=".pdf,application/pdf"
+            accept=".pdf,application/pdf,image/*"
             className="hidden"
             onChange={handleChange}
           />
@@ -77,9 +80,9 @@ const UploadZone = ({ onFileSelect }: UploadZoneProps) => {
             </div>
             <Button variant="hero" size="xl">
               <FileUp className="h-5 w-5 mr-2" />
-              Select PDF file
+              Select PDF or Image
             </Button>
-            <p className="text-sm text-muted-foreground">or drop PDF here</p>
+            <p className="text-sm text-muted-foreground">or drop PDF / PNG / JPG here</p>
           </div>
         </motion.div>
 
