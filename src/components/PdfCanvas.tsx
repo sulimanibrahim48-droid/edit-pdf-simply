@@ -723,7 +723,7 @@ const PdfCanvas = ({
                   }}
                 >
                   <textarea
-                    ref={textInputRef as never}
+                    ref={textInputRef}
                     className="w-full h-full outline-none resize-none bg-transparent p-0 m-0 border-0 leading-tight"
                     style={{
                       color: ann.color,
