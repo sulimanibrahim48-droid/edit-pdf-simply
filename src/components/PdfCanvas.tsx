@@ -67,7 +67,7 @@ const PdfCanvas = ({
   const [editingText, setEditingText] = useState("");
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const [pdfTextItems, setPdfTextItems] = useState<PdfTextItem[]>([]);
-  const textInputRef = useRef<HTMLInputElement>(null);
+  const textInputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageCache = useRef<Record<string, HTMLImageElement>>({});
   const [pendingImagePt, setPendingImagePt] = useState<{x: number, y: number} | null>(null);
@@ -664,18 +664,84 @@ const PdfCanvas = ({
           .map((ann) => {
             const canvas = overlayCanvasRef.current;
             if (!canvas) return null;
-            const style = getEditingInputStyle(ann);
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = rect.width / canvas.width;
+            const scaleY = rect.height / canvas.height;
+            const fontSize = ann.fontSize || 16;
+            const isReplace = ann.type === "text-replace";
+            const boxW = (ann.width || 200) * scaleX;
+            const boxH = (ann.height || fontSize * 1.4) * scaleY;
+            const boxX = ann.x * scaleX;
+            const boxY = (isReplace ? ann.y : ann.y - fontSize) * scaleY;
             return (
-              <input
+              <Rnd
                 key={ann.id}
-                ref={textInputRef}
-                className="absolute border-b-2 outline-none"
-                style={style}
-                value={editingText}
-                onChange={(e) => setEditingText(e.target.value)}
-                onBlur={commitTextEdit}
-                onKeyDown={(e) => e.key === "Enter" && commitTextEdit()}
-              />
+                size={{ width: boxW, height: boxH }}
+                position={{ x: boxX, y: boxY }}
+                bounds="parent"
+                style={{ zIndex: 30, pointerEvents: "auto" }}
+                onDragStop={(e, d) => {
+                  onAnnotationsChange(
+                    annotations.map((a) =>
+                      a.id === ann.id
+                        ? {
+                            ...a,
+                            x: d.x / scaleX,
+                            y: isReplace ? d.y / scaleY : d.y / scaleY + fontSize,
+                          }
+                        : a
+                    )
+                  );
+                }}
+                onResizeStop={(e, dir, refEl, delta, position) => {
+                  const newW = parseFloat(refEl.style.width) / scaleX;
+                  const newH = parseFloat(refEl.style.height) / scaleY;
+                  onAnnotationsChange(
+                    annotations.map((a) =>
+                      a.id === ann.id
+                        ? {
+                            ...a,
+                            width: newW,
+                            height: newH,
+                            x: position.x / scaleX,
+                            y: isReplace ? position.y / scaleY : position.y / scaleY + fontSize,
+                          }
+                        : a
+                    )
+                  );
+                }}
+                enableResizing={{
+                  top: true, right: true, bottom: true, left: true,
+                  topRight: true, bottomRight: true, bottomLeft: true, topLeft: true,
+                }}
+              >
+                <div
+                  className="w-full h-full"
+                  style={{
+                    background: isReplace ? "white" : "transparent",
+                    outline: "2px dashed #2563eb",
+                  }}
+                >
+                  <textarea
+                    ref={textInputRef}
+                    className="w-full h-full outline-none resize-none bg-transparent p-0 m-0 border-0 leading-tight"
+                    style={{
+                      color: ann.color,
+                      fontSize: fontSize * scaleY,
+                      fontFamily: "Inter, sans-serif",
+                    }}
+                    value={editingText}
+                    onChange={(e) => setEditingText(e.target.value)}
+                    onBlur={commitTextEdit}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        commitTextEdit();
+                      }
+                    }}
+                  />
+                </div>
+              </Rnd>
             );
           })}
         {/* Image resize overlays */}
