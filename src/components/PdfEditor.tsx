@@ -1,6 +1,8 @@
 import { useState, useCallback } from "react";
 import EditorToolbar, { type Tool } from "./EditorToolbar";
 import PdfCanvas from "./PdfCanvas";
+import PdfThumbnails from "./PdfThumbnails";
+
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { PDFDocument, rgb } from 'pdf-lib';
@@ -228,17 +230,25 @@ const PdfEditor = ({ file, onBack }: PdfEditorProps) => {
         activeColor={activeColor}
         onColorChange={setActiveColor}
       />
-      <PdfCanvas
-        file={file}
-        activeTool={activeTool}
-        zoom={zoom}
-        activeColor={activeColor}
-        annotations={annotations}
-        onAnnotationsChange={handleAnnotationsChange}
-        onToolChange={setActiveTool}
-        currentPage={currentPage}
-        onPageCountChange={setPageCount}
-      />
+      <div className="flex flex-1 overflow-hidden">
+        <PdfThumbnails
+          file={file}
+          currentPage={currentPage}
+          onPageChange={setCurrentPage}
+        />
+        <PdfCanvas
+          file={file}
+          activeTool={activeTool}
+          zoom={zoom}
+          activeColor={activeColor}
+          annotations={annotations}
+          onAnnotationsChange={handleAnnotationsChange}
+          onToolChange={setActiveTool}
+          currentPage={currentPage}
+          onPageCountChange={setPageCount}
+        />
+      </div>
+
       {/* Page navigation */}
       <div className="bg-toolbar text-toolbar-foreground px-4 py-2 flex items-center justify-center gap-4">
         <Button
