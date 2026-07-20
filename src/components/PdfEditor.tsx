@@ -1,6 +1,8 @@
 import { useState, useCallback } from "react";
 import EditorToolbar, { type Tool } from "./EditorToolbar";
 import PdfCanvas from "./PdfCanvas";
+import PdfThumbnails from "./PdfThumbnails";
+
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { PDFDocument, rgb } from 'pdf-lib';
