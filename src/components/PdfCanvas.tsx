@@ -727,7 +727,16 @@ const PdfCanvas = ({
                   }}
                 >
                   <textarea
-                    ref={textInputRef}
+                    ref={(el) => {
+                      textInputRef.current = el;
+                      if (el && document.activeElement !== el) {
+                        requestAnimationFrame(() => {
+                          el.focus();
+                          el.select();
+                        });
+                      }
+                    }}
+                    autoFocus
                     className="w-full h-full outline-none resize-none bg-transparent p-0 m-0 border-0 leading-tight"
                     style={{
                       color: ann.color,
@@ -735,6 +744,8 @@ const PdfCanvas = ({
                       fontFamily: "Inter, sans-serif",
                     }}
                     value={editingText}
+                    onFocusCapture={(e) => e.currentTarget.select()}
+                    onMouseDown={(e) => e.stopPropagation()}
                     onChange={(e) => setEditingText(e.target.value)}
                     onBlur={commitTextEdit}
                     onKeyDown={(e) => {
