@@ -679,6 +679,7 @@ const PdfCanvas = ({
                 size={{ width: boxW, height: boxH }}
                 position={{ x: boxX, y: boxY }}
                 bounds="parent"
+                cancel="textarea"
                 style={{ zIndex: 30, pointerEvents: "auto" }}
                 onDragStop={(e, d) => {
                   onAnnotationsChange(
