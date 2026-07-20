@@ -433,9 +433,12 @@ const PdfCanvas = ({
         setEditingTextId(id);
         setIsDrawing(false);
         setTimeout(() => {
-          textInputRef.current?.focus();
-          textInputRef.current?.select();
-        }, 50);
+          const ta = textInputRef.current;
+          if (ta) {
+            ta.focus();
+            ta.setSelectionRange(0, ta.value.length);
+          }
+        }, 60);
         return;
       }
 
